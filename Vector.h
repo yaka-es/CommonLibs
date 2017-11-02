@@ -184,7 +184,7 @@ template <class T> class VectorBase
 	/** Change the size of the Vector in items (not bytes), discarding content. */
 	void resize(size_t newElements) {
 		//VECTORDEBUG("VectorBase::resize("<<(void*)this<<","<<newElements<<")");
-		VECTORDEBUG("VectorBase::resize(%p,%d) %s",this,newElements, (mData?"delete":""));
+		VECTORDEBUG("VectorBase::resize(%p,%zu) %s",this,newElements, (mData?"delete":""));
 		if (mData!=NULL) delete[] mData;
 		vInit(newElements);
 	}

@@ -88,7 +88,10 @@ void UnixSignal::Handler(int sig)
 		s += "tar --create --verbose --file=- --directory=/tmp/staging."; s += p; s += "/ . | gzip > "; s += mTarFile; s += " ; ";
 		s += "rm -rf /tmp/staging." ; s += p;
 		printf("Running '%s'\n", s.c_str());
-		system(s.c_str());
+		int retcode = system(s.c_str());
+		if (retcode != 0) {
+			printf("Command failed: %s\n", strerror(errno));
+		}
 	    }
 	}
 	break;

@@ -71,7 +71,7 @@ class ThreadTest {
 		assert(mThread==((pthread_t)0));
 		int res;
 		res = pthread_attr_setstacksize(&mAttrib, mStackSize);
-		if (res) { fprintf(stderr,"pthread_setstacksize(%u) failed: error=%d %s\n",mStackSize,res,strerror(res)); }
+		if (res) { fprintf(stderr,"pthread_setstacksize(%zu) failed: error=%d %s\n",mStackSize,res,strerror(res)); }
 		assert(!res);
 		//res = pthread_create(&mThread, &mAttrib, &thread_main, p);
 		res = pthread_create(&mThread, &mAttrib, task, arg);
@@ -107,7 +107,9 @@ int main(int argc, char **argv)
 
 	// Check system limit.
 	printf("System thread limit:"); fflush(stdout);
-	system("cat /proc/sys/kernel/threads-max");
+	if (system("cat /proc/sys/kernel/threads-max") != 0) {
+		/* no-op */
+	}
 
 	// Check rlimit.
 	struct rlimit limits;

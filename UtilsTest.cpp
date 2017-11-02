@@ -94,7 +94,7 @@ void asciiEncoderTest(bool verbose)
 				string decoded = decodeToString(encoded.data(),encoded.size(),method,errorMessage);
 
 				// Check our results.
-				if (decoded.size() != len) { printf("FAIL %s len=%d size=%d encoded=%s\n",method,len,decoded.size(),encoded.c_str()); }
+				if (decoded.size() != len) { printf("FAIL %s len=%d size=%zu encoded=%s\n",method,len,decoded.size(),encoded.c_str()); }
 				if (binaryinput != decoded) { printf("FAIL %s testno=%d len=%d encoded=%s\n",method,testno,len,encoded.c_str()); }
 				// Paranoid double check manually:
 				for (unsigned j = 0; j < len; j++) {
