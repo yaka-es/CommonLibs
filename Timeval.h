@@ -1,54 +1,50 @@
-/*
-* Copyright 2008 Free Software Foundation, Inc.
-* Copyright 2014 Range Networks, Inc.
-*
-* This software is distributed under the terms of the GNU Affero Public License.
-* See the COPYING file in the main directory for details.
-*
-* This use of this software may be subject to additional restrictions.
-* See the LEGAL file in the main directory for details.
-
-	This program is free software: you can redistribute it and/or modify
-	it under the terms of the GNU Affero General Public License as published by
-	the Free Software Foundation, either version 3 of the License, or
-	(at your option) any later version.
-
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU Affero General Public License for more details.
-
-	You should have received a copy of the GNU Affero General Public License
-	along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-*/
-
+/* CommonLibs/Timeval.h */
+/*-
+ * Copyright 2008 Free Software Foundation, Inc.
+ * Copyright 2014 Range Networks, Inc.
+ *
+ * This software is distributed under the terms of the GNU Affero Public License.
+ * See the COPYING file in the main directory for details.
+ *
+ * This use of this software may be subject to additional restrictions.
+ * See the LEGAL file in the main directory for details.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #ifndef TIMEVAL_H
 #define TIMEVAL_H
 
+#include <sys/time.h>
+
 #include <stdint.h>
-#include "sys/time.h"
-#include <iostream>
 #include <unistd.h>
 
-
+#include <iostream>
 
 /** A wrapper on usleep to sleep for milliseconds. */
-inline void msleep(long v) { usleep(v*1000); }
-
+inline void msleep(long v) { usleep(v * 1000); }
 
 /** A C++ wrapper for struct timeval. */
 class Timeval {
 
-	private:
-
+private:
 	struct timeval mTimeval;
 
-	public:
-
+public:
 	/** Set the value to gettimeofday. */
-	void now() { gettimeofday(&mTimeval,NULL); }
+	void now() { gettimeofday(&mTimeval, NULL); }
 
 	/** Set the value to gettimeofday plus an offset. */
 	void future(unsigned ms);
@@ -60,15 +56,13 @@ class Timeval {
 		mTimeval.tv_usec = usec;
 	}
 
-	Timeval(const struct timeval& wTimeval)
-		:mTimeval(wTimeval)
-	{}
+	Timeval(const struct timeval &wTimeval) : mTimeval(wTimeval) {}
 
 	/**
 		Create a Timeval offset into the future.
 		@param offset milliseconds
 	*/
-	Timeval(unsigned offset=0) { future(offset); }
+	Timeval(unsigned offset = 0) { future(offset); }
 	//@}
 
 	/** Convert to a struct timespec. */
@@ -81,7 +75,7 @@ class Timeval {
 	uint32_t usec() const { return mTimeval.tv_usec; }
 
 	/** Return differnce from other (other-self), in ms. */
-	long delta(const Timeval& other) const;
+	long delta(const Timeval &other) const;
 
 	/** Elapsed time in ms. */
 	long elapsed() const { return delta(Timeval()); }
@@ -93,21 +87,18 @@ class Timeval {
 	bool passed() const;
 
 	/** Add a given number of minutes to the time. */
-	void addMinutes(unsigned minutes) { mTimeval.tv_sec += minutes*60; }
+	void addMinutes(unsigned minutes) { mTimeval.tv_sec += minutes * 60; }
 
-        /** Convert a time_t into a formatted string, using the ISO
-         *  YYYY-MM-DDTHH:MM:SS[Z] format.  If isLocal is true, use localtime,
-         *  otherwise, use gmtime.
-         */
-        static std::string isoTime(time_t t, bool isLocal);
-        static void isoTime(time_t t, std::string &result, bool isLocal);
-
+	/** Convert a time_t into a formatted string, using the ISO
+	 *  YYYY-MM-DDTHH:MM:SS[Z] format.  If isLocal is true, use localtime,
+	 *  otherwise, use gmtime.
+	 */
+	static std::string isoTime(time_t t, bool isLocal);
+	static void isoTime(time_t t, std::string &result, bool isLocal);
 };
 
-std::ostream& operator<<(std::ostream& os, const Timeval&);
+std::ostream &operator<<(std::ostream &os, const Timeval &);
 
-std::ostream& operator<<(std::ostream& os, const struct timespec&);
-
+std::ostream &operator<<(std::ostream &os, const struct timespec &);
 
 #endif
-// vim: ts=4 sw=4

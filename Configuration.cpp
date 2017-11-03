@@ -1,179 +1,167 @@
-/*
-* Copyright 2008, 2009, 2010 Free Software Foundation, Inc.
-* Copyright 2010 Kestrel Signal Processing, Inc.
-* Copyright 2011, 2012, 2014 Range Networks, Inc.
-*
-* This software is distributed under the terms of the GNU Affero Public License.
-* See the COPYING file in the main directory for details.
-*
-* This use of this software may be subject to additional restrictions.
-* See the LEGAL file in the main directory for details.
+/* CommonLibs/Configuration.cpp */
+/*-
+ * Copyright 2008, 2009, 2010 Free Software Foundation, Inc.
+ * Copyright 2010 Kestrel Signal Processing, Inc.
+ * Copyright 2011, 2012, 2014 Range Networks, Inc.
+ *
+ * This software is distributed under the terms of the GNU Affero Public License.
+ * See the COPYING file in the main directory for details.
+ *
+ * This use of this software may be subject to additional restrictions.
+ * See the LEGAL file in the main directory for details.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
-	This program is free software: you can redistribute it and/or modify
-	it under the terms of the GNU Affero General Public License as published by
-	the Free Software Foundation, either version 3 of the License, or
-	(at your option) any later version.
+#include <string.h>
 
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU Affero General Public License for more details.
-
-	You should have received a copy of the GNU Affero General Public License
-	along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-*/
-
+#include <fstream>
+#include <iostream>
 
 #include "Configuration.h"
 #include "Logger.h"
 #include "Utils.h"
-#include <fstream>
-#include <iostream>
-#include <string.h>
 
 #ifdef DEBUG_CONFIG
-#define	debugLogEarly gLogEarly
+#define debugLogEarly gLogEarly
 #else
-#define	debugLogEarly(...)
+#define debugLogEarly(...)
 #endif
 
 using namespace std;
 
 char gCmdName[20] = {0}; // Use a char* to avoid avoid static initialization of string, and race at startup.
 
-static const char* createConfigTable = {
+static const char *createConfigTable = {
 	"CREATE TABLE IF NOT EXISTS CONFIG ("
-		"KEYSTRING TEXT UNIQUE NOT NULL, "
-		"VALUESTRING TEXT, "
-		"STATIC INTEGER DEFAULT 0, "
-		"OPTIONAL INTEGER DEFAULT 0, "
-		"COMMENTS TEXT DEFAULT ''"
-	")"
-};
+	"KEYSTRING TEXT UNIQUE NOT NULL, "
+	"VALUESTRING TEXT, "
+	"STATIC INTEGER DEFAULT 0, "
+	"OPTIONAL INTEGER DEFAULT 0, "
+	"COMMENTS TEXT DEFAULT ''"
+	")"};
 
 // (pat) LOG() may not be initialized yet, so use syslog directly.
-#define LOGNOW(fmt,...) syslog(LOG_ERR, "ERR %s:" fmt,Utils::timestr().c_str(),__VA_ARGS__)
-
+#define LOGNOW(fmt, ...) syslog(LOG_ERR, "ERR %s:" fmt, Utils::timestr().c_str(), __VA_ARGS__)
 
 long ConfigurationRecord::number() const
 {
-	if (mValue.size() == 0 && ! mCRWarned) {
+	if (mValue.size() == 0 && !mCRWarned) {
 		LOGNOW("request for configuration key '%s' as number: configuration value is null", mCRKey.c_str());
 		mCRWarned = true;
 		return 0;
 	}
 	char *endptr;
-	long result = strtol(mValue.c_str(),&endptr,0);
-	if (*endptr && ! mCRWarned) {
+	long result = strtol(mValue.c_str(), &endptr, 0);
+	if (*endptr && !mCRWarned) {
 		// (pat) Warn if the number is invalid.
-		LOGNOW("request for configuration key '%s' as number: value could not be fully converted: '%s'", mCRKey.c_str(),mValue.c_str());
+		LOGNOW("request for configuration key '%s' as number: value could not be fully converted: '%s'",
+			mCRKey.c_str(), mValue.c_str());
 		mCRWarned = true;
 	}
 	return result;
 }
 
-
 float ConfigurationRecord::floatNumber() const
 {
-	if (mValue.size() == 0 && ! mCRWarned) {
-		LOGNOW("request for configuration key '%s' as float number: configuration value is null", mCRKey.c_str());
+	if (mValue.size() == 0 && !mCRWarned) {
+		LOGNOW("request for configuration key '%s' as float number: configuration value is null",
+			mCRKey.c_str());
 		mCRWarned = true;
 		return 0;
 	}
-	//sscanf(mValue.c_str(),"%f",&val);
+	// sscanf(mValue.c_str(),"%f",&val);
 	char *endptr;
-	float val = strtof(mValue.c_str(),&endptr);
-	if (*endptr && ! mCRWarned) {
+	float val = strtof(mValue.c_str(), &endptr);
+	if (*endptr && !mCRWarned) {
 		// (pat) Warn if the number is invalid.
-		LOGNOW("request for configuration key '%s' as float number: value could not be fully converted: '%s'", mCRKey.c_str(),mValue.c_str());
+		LOGNOW("request for configuration key '%s' as float number: value could not be fully converted: '%s'",
+			mCRKey.c_str(), mValue.c_str());
 		mCRWarned = true;
 	}
 	return val;
 }
 
-
-ConfigurationTable::ConfigurationTable(const char* filename, const char *wCmdName, ConfigurationKeyMap wSchema)
+ConfigurationTable::ConfigurationTable(const char *filename, const char *wCmdName, ConfigurationKeyMap wSchema)
 {
 	gLogEarly(LOG_INFO, "opening configuration table from path %s", filename);
 	// Connect to the database.
-	int rc = sqlite3_open(filename,&mDB);
+	int rc = sqlite3_open(filename, &mDB);
 	// (pat) When I used malloc here, sqlite3 sporadically crashes.
 	if (wCmdName) {
-		strncpy(gCmdName,wCmdName,18);
+		strncpy(gCmdName, wCmdName, 18);
 		gCmdName[18] = 0;
-		strcat(gCmdName,":");
+		strcat(gCmdName, ":");
 	}
 	if (rc) {
-		gLogEarly(LOG_EMERG, "cannot open configuration database at %s, error message: %s", filename, sqlite3_errmsg(mDB));
+		gLogEarly(LOG_EMERG, "cannot open configuration database at %s, error message: %s", filename,
+			sqlite3_errmsg(mDB));
 		sqlite3_close(mDB);
 		mDB = NULL;
 		return;
 	}
 	// Create the table, if needed.
-	if (!sqlite3_command(mDB,createConfigTable)) {
-		gLogEarly(LOG_EMERG, "cannot create configuration table in database at %s, error message: %s", filename, sqlite3_errmsg(mDB));
+	if (!sqlite3_command(mDB, createConfigTable)) {
+		gLogEarly(LOG_EMERG, "cannot create configuration table in database at %s, error message: %s", filename,
+			sqlite3_errmsg(mDB));
 	}
 
 	// Pat and David both do not want to use WAL mode on the config databases.
 	// Set high-concurrency WAL mode.
-	//if (!sqlite3_command(mDB,enableWAL)) {
-	//	gLogEarly(LOG_EMERG, "cannot enable WAL mode on database at %s, error message: %s", filename, sqlite3_errmsg(mDB));
+	// if (!sqlite3_command(mDB,enableWAL)) {
+	//	gLogEarly(LOG_EMERG, "cannot enable WAL mode on database at %s, error message: %s", filename,
+	// sqlite3_errmsg(mDB));
 	//}
 
 	// Build CommonLibs schema
 	ConfigurationKey *tmp;
-	tmp = new ConfigurationKey("Control.NumSQLTries","3",
-		"attempts",
-		ConfigurationKey::DEVELOPER,
+	tmp = new ConfigurationKey("Control.NumSQLTries", "3", "attempts", ConfigurationKey::DEVELOPER,
 		ConfigurationKey::VALRANGE,
-		"1:10",// educated guess
-		false,
-		"Number of times to retry SQL queries before declaring a database access failure."
-	);
+		"1:10", // educated guess
+		false, "Number of times to retry SQL queries before declaring a database access failure.");
 	mSchema[tmp->getName()] = *tmp;
 	delete tmp;
 
-	tmp = new ConfigurationKey("Log.Alarms.Max","20",
-		"alarms",
-		ConfigurationKey::CUSTOMER,
+	tmp = new ConfigurationKey("Log.Alarms.Max", "20", "alarms", ConfigurationKey::CUSTOMER,
 		ConfigurationKey::VALRANGE,
-		"10:20",// educated guess
-		false,
-		"Maximum number of alarms to remember inside the application."
-	);
+		"10:20", // educated guess
+		false, "Maximum number of alarms to remember inside the application.");
 	mSchema[tmp->getName()] = *tmp;
 	delete tmp;
 
-	tmp = new ConfigurationKey("Log.File","",
-		"",
-		ConfigurationKey::DEVELOPER,
-		ConfigurationKey::FILEPATH_OPT,// audited
-		"",
-		false,
+	tmp = new ConfigurationKey("Log.File", "", "", ConfigurationKey::DEVELOPER,
+		ConfigurationKey::FILEPATH_OPT, // audited
+		"", false,
 		"Path to use for textfile based logging.  "
-			"By default, this feature is disabled.  "
-			"To enable, specify an absolute path to the file you wish to use, eg: /tmp/my-debug.log.  "
-			"To disable again, execute \"unconfig Log.File\"."
-	);
+		"By default, this feature is disabled.  "
+		"To enable, specify an absolute path to the file you wish to use, eg: /tmp/my-debug.log.  "
+		"To disable again, execute \"unconfig Log.File\".");
 	mSchema[tmp->getName()] = *tmp;
 	delete tmp;
 
-	tmp = new ConfigurationKey("Log.Level","NOTICE",
-		"",
-		ConfigurationKey::CUSTOMER,
-		ConfigurationKey::CHOICE,
+	tmp = new ConfigurationKey("Log.Level", "NOTICE", "", ConfigurationKey::CUSTOMER, ConfigurationKey::CHOICE,
 		"EMERG|EMERGENCY - report serious faults associated with service failure or hardware damage,"
-			"ALERT|ALERT - report likely service disruption caused by misconfiguration or poor connectivity,"
-			"CRIT|CRITICAL - report anomalous events that are likely to degrade service,"
-			"ERR|ERROR - report internal errors of the software that may result in degradation of service in unusual circumstances,"
-			"WARNING|WARNING - report anomalous events that may indicate a degradation of normal service,"
-			"NOTICE|NOTICE - report anomalous events that probably do not affect service but may be of interest to network operators,"
-			"INFO|INFORMATION - report normal events,"
-			"DEBUG|DEBUG - only for use by developers and will degrade system performance",
-		false,
-		"Default logging level when no other level is defined for a file."
-	);
+		"ALERT|ALERT - report likely service disruption caused by misconfiguration or poor connectivity,"
+		"CRIT|CRITICAL - report anomalous events that are likely to degrade service,"
+		"ERR|ERROR - report internal errors of the software that may result in degradation of service in "
+		"unusual circumstances,"
+		"WARNING|WARNING - report anomalous events that may indicate a degradation of normal service,"
+		"NOTICE|NOTICE - report anomalous events that probably do not affect service but may be of interest to "
+		"network operators,"
+		"INFO|INFORMATION - report normal events,"
+		"DEBUG|DEBUG - only for use by developers and will degrade system performance",
+		false, "Default logging level when no other level is defined for a file.");
 	mSchema[tmp->getName()] = *tmp;
 	delete tmp;
 
@@ -187,30 +175,34 @@ ConfigurationTable::ConfigurationTable(const char* filename, const char *wCmdNam
 #if DUMP_CONFIGURATION_TABLE
 	// (pat) Dump any non-default config variables...
 	try {
-		if (wCmdName == NULL) { wCmdName = ""; }
-		LOG(INFO) << wCmdName << ":" << " List of non-default config parameters:";
+		if (wCmdName == NULL) {
+			wCmdName = "";
+		}
+		LOG(INFO) << wCmdName << ":"
+			  << " List of non-default config parameters:";
 		string snippet("");
 		ConfigurationKeyMap view = getSimilarKeys(snippet);
 		for (ConfigurationKeyMap::iterator it = view.begin(); it != view.end(); it++) {
 			string name = it->first;
 			ConfigurationKey key = it->second;
 			if (name != key.getName()) {
-				LOG(ALERT) << "SQL database is corrupt at name:"<<name <<" !=  key:"<<key.getName();
+				LOG(ALERT)
+					<< "SQL database is corrupt at name:" << name << " !=  key:" << key.getName();
 			}
-			string defaultValue= key.getDefaultValue();
+			string defaultValue = key.getDefaultValue();
 			string value = this->getStr(name);
 			if (value != defaultValue) {
-				LOG(INFO) << "Config Variable"<<LOGVAR(name) <<LOGVAR(value) <<LOGVAR(defaultValue);
+				LOG(INFO) << "Config Variable" << LOGVAR(name) << LOGVAR(value) << LOGVAR(defaultValue);
 			}
 		}
 	} catch (...) {
-		LOG(INFO) << wCmdName << ":" << " EXCEPTION CAUGHT";
+		LOG(INFO) << wCmdName << ":"
+			  << " EXCEPTION CAUGHT";
 	}
 #endif
-
 }
 
-string ConfigurationTable::getDefaultSQL(const std::string& program, const std::string& version)
+string ConfigurationTable::getDefaultSQL(const std::string &program, const std::string &version)
 {
 	stringstream ss;
 	ConfigurationKeyMap::iterator mp;
@@ -223,40 +215,42 @@ string ConfigurationTable::getDefaultSQL(const std::string& program, const std::
 	ss << "-- rather in the program's ConfigurationKey schema." << endl;
 	ss << "--" << endl;
 	ss << "PRAGMA foreign_keys=OFF;" << endl;
-	//ss << "PRAGMA journal_mode=WAL;" << endl;
+	// ss << "PRAGMA journal_mode=WAL;" << endl;
 	ss << "BEGIN TRANSACTION;" << endl;
-	ss << "CREATE TABLE IF NOT EXISTS CONFIG ( KEYSTRING TEXT UNIQUE NOT NULL, VALUESTRING TEXT, STATIC INTEGER DEFAULT 0, OPTIONAL INTEGER DEFAULT 0, COMMENTS TEXT DEFAULT '');" << endl;
+	ss << "CREATE TABLE IF NOT EXISTS CONFIG ( KEYSTRING TEXT UNIQUE NOT NULL, VALUESTRING TEXT, STATIC INTEGER "
+	      "DEFAULT 0, OPTIONAL INTEGER DEFAULT 0, COMMENTS TEXT DEFAULT '');"
+	   << endl;
 
 	mp = mSchema.begin();
 	while (mp != mSchema.end()) {
 		ss << "INSERT OR IGNORE INTO \"CONFIG\" VALUES(";
-			// name
-			ss << "'" << mp->first << "',";
-			// default
-			ss << "'" << mp->second.getDefaultValue() << "',";
-			// static
-			if (mp->second.isStatic()) {
-				ss << "1";
-			} else {
-				ss << "0";
-			}
-			ss << ",";
-			// optional
-			ss << "0,";
-			// description
-			const string description = mp->second.getDescription();
-			// Try to use a quote that will work: if the description contains ' quote with " else '.
-			// This is not perfect because these quotes could themselves be quoted.
-			const char * quote = string::npos != description.find('\'') ? "\"" : "'";
-			ss << quote;
-			if (mp->second.getType() == ConfigurationKey::BOOLEAN) {
-				ss << "1=enabled, 0=disabled - ";
-			}
-			ss << mp->second.getDescription();
-			if (mp->second.isStatic()) {
-				ss << "  Static.";
-			}
-			ss << quote;
+		// name
+		ss << "'" << mp->first << "',";
+		// default
+		ss << "'" << mp->second.getDefaultValue() << "',";
+		// static
+		if (mp->second.isStatic()) {
+			ss << "1";
+		} else {
+			ss << "0";
+		}
+		ss << ",";
+		// optional
+		ss << "0,";
+		// description
+		const string description = mp->second.getDescription();
+		// Try to use a quote that will work: if the description contains ' quote with " else '.
+		// This is not perfect because these quotes could themselves be quoted.
+		const char *quote = string::npos != description.find('\'') ? "\"" : "'";
+		ss << quote;
+		if (mp->second.getType() == ConfigurationKey::BOOLEAN) {
+			ss << "1=enabled, 0=disabled - ";
+		}
+		ss << mp->second.getDescription();
+		if (mp->second.isStatic()) {
+			ss << "  Static.";
+		}
+		ss << quote;
 		ss << ");" << endl;
 		mp++;
 	}
@@ -267,7 +261,7 @@ string ConfigurationTable::getDefaultSQL(const std::string& program, const std::
 	return ss.str();
 }
 
-string ConfigurationTable::getTeX(const std::string& program, const std::string& version)
+string ConfigurationTable::getTeX(const std::string &program, const std::string &version)
 {
 	stringstream ss;
 	ConfigurationKeyMap::iterator mp;
@@ -283,10 +277,10 @@ string ConfigurationTable::getTeX(const std::string& program, const std::string&
 	while (mp != mSchema.end()) {
 		if (mp->second.getVisibility() == ConfigurationKey::CUSTOMERSITE) {
 			ss << "	\\item \\texttt{";
-				// name
-				ss << mp->first << "} -- ";
-				// description
-				ss << mp->second.getDescription();
+			// name
+			ss << mp->first << "} -- ";
+			// description
+			ss << mp->second.getDescription();
 			ss << endl;
 		}
 		mp++;
@@ -300,16 +294,14 @@ string ConfigurationTable::getTeX(const std::string& program, const std::string&
 	mp = mSchema.begin();
 	while (mp != mSchema.end()) {
 		if (mp->second.getVisibility() != ConfigurationKey::CUSTOMERSITE &&
-			(
-				mp->second.getVisibility() == ConfigurationKey::CUSTOMER ||
+			(mp->second.getVisibility() == ConfigurationKey::CUSTOMER ||
 				mp->second.getVisibility() == ConfigurationKey::CUSTOMERTUNE ||
-				mp->second.getVisibility() == ConfigurationKey::CUSTOMERWARN
-			)) {
+				mp->second.getVisibility() == ConfigurationKey::CUSTOMERWARN)) {
 			ss << "	\\item \\texttt{";
-				// name
-				ss << mp->first << "} -- ";
-				// description
-				ss << mp->second.getDescription();
+			// name
+			ss << mp->first << "} -- ";
+			// description
+			ss << mp->second.getDescription();
 			ss << endl;
 		}
 		mp++;
@@ -325,10 +317,10 @@ string ConfigurationTable::getTeX(const std::string& program, const std::string&
 		if (mp->second.getVisibility() == ConfigurationKey::FACTORY ||
 			mp->second.getVisibility() == ConfigurationKey::DEVELOPER) {
 			ss << "	\\item \\texttt{";
-				// name
-				ss << mp->first << "} -- ";
-				// description
-				ss << mp->second.getDescription();
+			// name
+			ss << mp->first << "} -- ";
+			// description
+			ss << mp->second.getDescription();
 			ss << endl;
 		}
 		mp++;
@@ -341,307 +333,309 @@ string ConfigurationTable::getTeX(const std::string& program, const std::string&
 	return Utils::replaceAll(tmp, "_", "\\_");
 }
 
-bool ConfigurationTable::defines(const string& key)
+bool ConfigurationTable::defines(const string &key)
 {
 	try {
 		ScopedLock lock(mLock);
 		return lookup(key).defined();
 	} catch (ConfigurationTableKeyNotFound) {
 		// TODO: re-enable once we figure out why this message is being sent to syslog regardless of log level
-		//gLogEarly(LOG_DEBUG, "configuration parameter %s not found", key.c_str());
+		// gLogEarly(LOG_DEBUG, "configuration parameter %s not found", key.c_str());
 		return false;
 	}
 }
 
-bool ConfigurationTable::keyDefinedInSchema(const std::string& name)
+bool ConfigurationTable::keyDefinedInSchema(const std::string &name)
 {
 	return mSchema.find(name) == mSchema.end() ? false : true;
 }
 
-bool ConfigurationTable::isValidValue(const std::string& name, const std::string& val) {
+bool ConfigurationTable::isValidValue(const std::string &name, const std::string &val)
+{
 	bool ret = false;
 
 	ConfigurationKey key = mSchema[name];
 
 	switch (key.getType()) {
-		case ConfigurationKey::BOOLEAN: {
-			if (val == "1" || val == "0") {
-				ret = true;
-			}
+	case ConfigurationKey::BOOLEAN: {
+		if (val == "1" || val == "0") {
+			ret = true;
+		}
+		break;
+	}
+
+	case ConfigurationKey::CHOICE_OPT: {
+		if (val.length() == 0) {
+			ret = true;
 			break;
 		}
+	}
+	case ConfigurationKey::CHOICE: {
+		int startPos = -1;
+		uint endPos = 0;
 
-		case ConfigurationKey::CHOICE_OPT: {
-			if (val.length() == 0) {
-				ret = true;
-				break;
-			}
-		}
-		case ConfigurationKey::CHOICE: {
-			int startPos = -1;
-			uint endPos = 0;
+		std::string tmp = key.getValidValues();
 
-			std::string tmp = key.getValidValues();
-
-			do {
-				startPos++;
-				if ((endPos = tmp.find('|', startPos)) != std::string::npos) {
-					if (val == tmp.substr(startPos, endPos-startPos)) {
-						ret = true;
-						break;
-					}
-				} else {
-					if (val == tmp.substr(startPos, tmp.find(',', startPos)-startPos)) {
-						ret = true;
-						break;
-					}
-				}
-
-			} while ((startPos = tmp.find(',', startPos)) != (int)std::string::npos);
-			break;
-		}
-
-		case ConfigurationKey::CIDR_OPT: {
-			if (val.length() == 0) {
-				ret = true;
-				break;
-			}
-		}
-		case ConfigurationKey::CIDR: {
-			uint delimiter;
-			std::string ip;
-			int cidr = -1;
-
-			delimiter = val.find('/');
-			if (delimiter != std::string::npos) {
-				ip = val.substr(0, delimiter);
-				std::stringstream(val.substr(delimiter+1)) >> cidr;
-				if (ConfigurationKey::isValidIP(ip) && 0 <= cidr && cidr <= 32) {
+		do {
+			startPos++;
+			if ((endPos = tmp.find('|', startPos)) != std::string::npos) {
+				if (val == tmp.substr(startPos, endPos - startPos)) {
 					ret = true;
+					break;
+				}
+			} else {
+				if (val == tmp.substr(startPos, tmp.find(',', startPos) - startPos)) {
+					ret = true;
+					break;
 				}
 			}
+
+		} while ((startPos = tmp.find(',', startPos)) != (int)std::string::npos);
+		break;
+	}
+
+	case ConfigurationKey::CIDR_OPT: {
+		if (val.length() == 0) {
+			ret = true;
 			break;
 		}
+	}
+	case ConfigurationKey::CIDR: {
+		uint delimiter;
+		std::string ip;
+		int cidr = -1;
 
-		case ConfigurationKey::FILEPATH_OPT: {
-			if (val.length() == 0) {
+		delimiter = val.find('/');
+		if (delimiter != std::string::npos) {
+			ip = val.substr(0, delimiter);
+			std::stringstream(val.substr(delimiter + 1)) >> cidr;
+			if (ConfigurationKey::isValidIP(ip) && 0 <= cidr && cidr <= 32) {
 				ret = true;
-				break;
 			}
 		}
-		case ConfigurationKey::FILEPATH: {
-			regex_t r;
-			const char* expression = "^[a-zA-Z0-9/_.-]+$";
-			int result = regcomp(&r, expression, REG_EXTENDED);
-			if (result) {
-				char msg[256];
-				regerror(result,&r,msg,255);
-				break;//abort();
-			}
-			if (regexec(&r, val.c_str(), 0, NULL, 0)==0) {
-				ret = true;
-			}
-			regfree(&r);
+		break;
+	}
+
+	case ConfigurationKey::FILEPATH_OPT: {
+		if (val.length() == 0) {
+			ret = true;
 			break;
 		}
-
-		case ConfigurationKey::HOSTANDPORT_OPT: {
-			if (val.length() == 0) {
-				ret = true;
-				break;
-			}
+	}
+	case ConfigurationKey::FILEPATH: {
+		regex_t r;
+		const char *expression = "^[a-zA-Z0-9/_.-]+$";
+		int result = regcomp(&r, expression, REG_EXTENDED);
+		if (result) {
+			char msg[256];
+			regerror(result, &r, msg, 255);
+			break; // abort();
 		}
-		case ConfigurationKey::HOSTANDPORT: {
-			uint delimiter;
-			std::string host;
-			int port = -1;
-			bool validHost = false;
+		if (regexec(&r, val.c_str(), 0, NULL, 0) == 0) {
+			ret = true;
+		}
+		regfree(&r);
+		break;
+	}
 
-			delimiter = val.find(':');
-			if (delimiter != std::string::npos) {
-				host = val.substr(0, delimiter);
-				std::stringstream(val.substr(delimiter+1)) >> port;
-				if (ConfigurationKey::isValidIP(host)) {
+	case ConfigurationKey::HOSTANDPORT_OPT: {
+		if (val.length() == 0) {
+			ret = true;
+			break;
+		}
+	}
+	case ConfigurationKey::HOSTANDPORT: {
+		uint delimiter;
+		std::string host;
+		int port = -1;
+		bool validHost = false;
+
+		delimiter = val.find(':');
+		if (delimiter != std::string::npos) {
+			host = val.substr(0, delimiter);
+			std::stringstream(val.substr(delimiter + 1)) >> port;
+			if (ConfigurationKey::isValidIP(host)) {
+				validHost = true;
+			} else {
+				regex_t r;
+				const char *expression = "^[a-zA-Z0-9_.-]+$";
+				int result = regcomp(&r, expression, REG_EXTENDED);
+				if (result) {
+					char msg[256];
+					regerror(result, &r, msg, 255);
+					break; // abort();
+				}
+				if (regexec(&r, host.c_str(), 0, NULL, 0) == 0) {
 					validHost = true;
-				} else {
-					regex_t r;
-					const char* expression = "^[a-zA-Z0-9_.-]+$";
-					int result = regcomp(&r, expression, REG_EXTENDED);
-					if (result) {
-						char msg[256];
-						regerror(result,&r,msg,255);
-						break;//abort();
-					}
-					if (regexec(&r, host.c_str(), 0, NULL, 0)==0) {
-						validHost = true;
-					}
-					regfree(&r);
 				}
-
-				if (validHost && 1 <= port && port <= 65535) {
-					ret = true;
-				}
+				regfree(&r);
 			}
-			break;
-		}
 
-		case ConfigurationKey::IPADDRESS_OPT: {
-			if (val.length() == 0) {
+			if (validHost && 1 <= port && port <= 65535) {
 				ret = true;
-				break;
 			}
 		}
-		case ConfigurationKey::IPADDRESS: {
-			ret = ConfigurationKey::isValidIP(val);
+		break;
+	}
+
+	case ConfigurationKey::IPADDRESS_OPT: {
+		if (val.length() == 0) {
+			ret = true;
 			break;
 		}
+	}
+	case ConfigurationKey::IPADDRESS: {
+		ret = ConfigurationKey::isValidIP(val);
+		break;
+	}
 
-		case ConfigurationKey::IPANDPORT: {
-			uint delimiter;
-			std::string ip;
-			int port = -1;
+	case ConfigurationKey::IPANDPORT: {
+		uint delimiter;
+		std::string ip;
+		int port = -1;
 
-			delimiter = val.find(':');
-			if (delimiter != std::string::npos) {
-				ip = val.substr(0, delimiter);
-				std::stringstream(val.substr(delimiter+1)) >> port;
-				if (ConfigurationKey::isValidIP(ip) && 1 <= port && port <= 65535) {
-					ret = true;
-				}
-			}
-			break;
-		}
-
-		case ConfigurationKey::MIPADDRESS_OPT: {
-			if (val.length() == 0) {
+		delimiter = val.find(':');
+		if (delimiter != std::string::npos) {
+			ip = val.substr(0, delimiter);
+			std::stringstream(val.substr(delimiter + 1)) >> port;
+			if (ConfigurationKey::isValidIP(ip) && 1 <= port && port <= 65535) {
 				ret = true;
-				break;
 			}
 		}
-		case ConfigurationKey::MIPADDRESS: {
-			int startPos = -1;
-			uint endPos = 0;
-			uint delimiter;
-			std::string ip;
-			int port = -1;
+		break;
+	}
 
-			do {
-				startPos++;
-				endPos = val.find(' ', startPos);
-				port = -1;
+	case ConfigurationKey::MIPADDRESS_OPT: {
+		if (val.length() == 0) {
+			ret = true;
+			break;
+		}
+	}
+	case ConfigurationKey::MIPADDRESS: {
+		int startPos = -1;
+		uint endPos = 0;
+		uint delimiter;
+		std::string ip;
+		int port = -1;
 
-				if (ConfigurationKey::isValidIP(val.substr(startPos, endPos-startPos))) {
-					ret = true;
-				} else {
-					delimiter = val.find(':');
-					if (delimiter != std::string::npos) {
-						ip = val.substr(startPos, delimiter);
-						std::stringstream(val.substr(delimiter+1, endPos)) >> port;
-						if (ConfigurationKey::isValidIP(ip) && 1 <= port && port <= 65535) {
-							ret = true;
-						} else {
-							ret = false;
-							break;
-						}
+		do {
+			startPos++;
+			endPos = val.find(' ', startPos);
+			port = -1;
+
+			if (ConfigurationKey::isValidIP(val.substr(startPos, endPos - startPos))) {
+				ret = true;
+			} else {
+				delimiter = val.find(':');
+				if (delimiter != std::string::npos) {
+					ip = val.substr(startPos, delimiter);
+					std::stringstream(val.substr(delimiter + 1, endPos)) >> port;
+					if (ConfigurationKey::isValidIP(ip) && 1 <= port && port <= 65535) {
+						ret = true;
 					} else {
 						ret = false;
 						break;
 					}
+				} else {
+					ret = false;
+					break;
 				}
+			}
 
-			} while ((startPos = endPos) != (int)std::string::npos);
+		} while ((startPos = endPos) != (int)std::string::npos);
+		break;
+	}
+
+	case ConfigurationKey::PORT_OPT: {
+		if (val.length() == 0) {
+			ret = true;
 			break;
 		}
+	}
+	case ConfigurationKey::PORT: {
+		int intVal;
 
-		case ConfigurationKey::PORT_OPT: {
-			if (val.length() == 0) {
-				ret = true;
-				break;
-			}
+		std::stringstream(val) >> intVal;
+
+		if (1 <= intVal && intVal <= 65535) {
+			ret = true;
 		}
-		case ConfigurationKey::PORT: {
-			int intVal;
+		break;
+	}
 
-			std::stringstream(val) >> intVal;
-
-			if (1 <= intVal && intVal <= 65535) {
-				ret = true;
-			}
+	case ConfigurationKey::REGEX_OPT: {
+		if (val.length() == 0) {
+			ret = true;
 			break;
 		}
-
-		case ConfigurationKey::REGEX_OPT: {
-			if (val.length() == 0) {
-				ret = true;
-				break;
-			}
+	}
+	case ConfigurationKey::REGEX: {
+		regex_t r;
+		const char *expression = val.c_str();
+		int result = regcomp(&r, expression, REG_EXTENDED);
+		if (result) {
+			char msg[256];
+			regerror(result, &r, msg, 255);
+		} else {
+			ret = true;
 		}
-		case ConfigurationKey::REGEX: {
-			regex_t r;
-			const char* expression = val.c_str();
-			int result = regcomp(&r, expression, REG_EXTENDED);
-			if (result) {
-				char msg[256];
-				regerror(result,&r,msg,255);
-			} else {
-				ret = true;
-			}
-			regfree(&r);
+		regfree(&r);
+		break;
+	}
+
+	case ConfigurationKey::STRING_OPT: {
+		if (val.length() == 0) {
+			ret = true;
 			break;
 		}
-
-		case ConfigurationKey::STRING_OPT: {
-			if (val.length() == 0) {
-				ret = true;
-				break;
-			}
+	}
+	case ConfigurationKey::STRING: {
+		regex_t r;
+		const char *expression = key.getValidValues().c_str();
+		int result = regcomp(&r, expression, REG_EXTENDED);
+		if (result) {
+			char msg[256];
+			regerror(result, &r, msg, 255);
+			break; // abort();
 		}
-		case ConfigurationKey::STRING: {
-			regex_t r;
-			const char* expression = key.getValidValues().c_str();
-			int result = regcomp(&r, expression, REG_EXTENDED);
-			if (result) {
-				char msg[256];
-				regerror(result,&r,msg,255);
-				break;//abort();
-			}
-			if (regexec(&r, val.c_str(), 0, NULL, 0)==0) {
-				ret = true;
-			}
-			regfree(&r);
-			break;
+		if (regexec(&r, val.c_str(), 0, NULL, 0) == 0) {
+			ret = true;
+		}
+		regfree(&r);
+		break;
+	}
+
+	case ConfigurationKey::VALRANGE: {
+		regex_t r;
+		int result;
+		if (key.getValidValues().find('.') != std::string::npos) {
+			result = regcomp(&r, "^[0-9.-]+$", REG_EXTENDED);
+		} else {
+			result = regcomp(&r, "^[0-9-]+$", REG_EXTENDED);
+		}
+		if (result) {
+			char msg[256];
+			regerror(result, &r, msg, 255);
+			break; // abort();
+		}
+		if (regexec(&r, val.c_str(), 0, NULL, 0) != 0) {
+			ret = false;
+		} else if (key.getValidValues().find('.') != std::string::npos) {
+			ret = ConfigurationKey::isInValRange<float>(key, val, false);
+		} else {
+			ret = ConfigurationKey::isInValRange<int>(key, val, true);
 		}
 
-		case ConfigurationKey::VALRANGE: {
-			regex_t r;
-			int result;
-			if (key.getValidValues().find('.') != std::string::npos) {
-				result = regcomp(&r, "^[0-9.-]+$", REG_EXTENDED);
-			} else {
-				result = regcomp(&r, "^[0-9-]+$", REG_EXTENDED);
-			}
-			if (result) {
-				char msg[256];
-				regerror(result,&r,msg,255);
-				break;//abort();
-			}
-			if (regexec(&r, val.c_str(), 0, NULL, 0)!=0) {
-				ret = false;
-			} else if (key.getValidValues().find('.') != std::string::npos) {
-				ret = ConfigurationKey::isInValRange<float>(key, val, false);
-			} else {
-				ret = ConfigurationKey::isInValRange<int>(key, val, true);
-			}
-
-			regfree(&r);
-			break;
-		}
+		regfree(&r);
+		break;
+	}
 	}
 
 	return ret;
 }
 
-ConfigurationKeyMap ConfigurationTable::getSimilarKeys(const std::string& snippet) {
+ConfigurationKeyMap ConfigurationTable::getSimilarKeys(const std::string &snippet)
+{
 	ConfigurationKeyMap tmp;
 
 	ConfigurationKeyMap::const_iterator mp = mSchema.begin();
@@ -655,7 +649,7 @@ ConfigurationKeyMap ConfigurationTable::getSimilarKeys(const std::string& snippe
 	return tmp;
 }
 
-const ConfigurationRecord& ConfigurationTable::lookup(const string& key)
+const ConfigurationRecord &ConfigurationTable::lookup(const string &key)
 {
 	assert(mDB);
 	checkCacheAge();
@@ -665,40 +659,39 @@ const ConfigurationRecord& ConfigurationTable::lookup(const string& key)
 	// Check the cache.
 	// This is cheap.
 	ConfigurationMap::const_iterator where = mCache.find(key);
-	if (where!=mCache.end()) {
-		if (where->second.defined()) return where->second;
+	if (where != mCache.end()) {
+		if (where->second.defined())
+			return where->second;
 		throw ConfigurationTableKeyNotFound(key);
 	}
 
 	// Check the database.
 	// This is more expensive.
 	char *value = NULL;
-	sqlite3_single_lookup(mDB,"CONFIG",
-			"KEYSTRING",key.c_str(),"VALUESTRING",value);
+	sqlite3_single_lookup(mDB, "CONFIG", "KEYSTRING", key.c_str(), "VALUESTRING", value);
 
 	// (pat 9-2014) If sqlite3_single_lookup returns false, the behavior below is incorrect.
 
 	// value found, cache the result
 	if (value) {
-		mCache[key] = ConfigurationRecord(key,value);
-	// key definition found, cache the default
+		mCache[key] = ConfigurationRecord(key, value);
+		// key definition found, cache the default
 	} else if (keyDefinedInSchema(key)) {
-		mCache[key] = ConfigurationRecord(key,mSchema[key].getDefaultValue());
-	// total miss, cache the error
+		mCache[key] = ConfigurationRecord(key, mSchema[key].getDefaultValue());
+		// total miss, cache the error
 	} else {
-		mCache[key] = ConfigurationRecord(key,false);
+		mCache[key] = ConfigurationRecord(key, false);
 		throw ConfigurationTableKeyNotFound(key);
 	}
 
-	if (value) free(value);
+	if (value)
+		free(value);
 
 	// Leave mLock locked.  The caller holds it still.
 	return mCache[key];
 }
 
-
-
-bool ConfigurationTable::isStatic(const string& key)
+bool ConfigurationTable::isStatic(const string &key)
 {
 	if (keyDefinedInSchema(key)) {
 		return mSchema[key].isStatic();
@@ -707,10 +700,7 @@ bool ConfigurationTable::isStatic(const string& key)
 	}
 }
 
-
-
-
-string ConfigurationTable::getStr(const string& key)
+string ConfigurationTable::getStr(const string &key)
 {
 	// We need the lock because rec is a reference into the cache.
 	try {
@@ -723,8 +713,7 @@ string ConfigurationTable::getStr(const string& key)
 	}
 }
 
-
-bool ConfigurationTable::getBool(const string& key)
+bool ConfigurationTable::getBool(const string &key)
 {
 	try {
 		return getNum(key) != 0;
@@ -735,8 +724,7 @@ bool ConfigurationTable::getBool(const string& key)
 	}
 }
 
-
-long ConfigurationTable::getNum(const string& key)
+long ConfigurationTable::getNum(const string &key)
 {
 	// We need the lock because rec is a reference into the cache.
 	try {
@@ -749,8 +737,7 @@ long ConfigurationTable::getNum(const string& key)
 	}
 }
 
-
-float ConfigurationTable::getFloat(const string& key)
+float ConfigurationTable::getFloat(const string &key)
 {
 	try {
 		ScopedLock lock(mLock);
@@ -762,13 +749,13 @@ float ConfigurationTable::getFloat(const string& key)
 	}
 }
 
-std::vector<string> ConfigurationTable::getVectorOfStrings(const string& key)
+std::vector<string> ConfigurationTable::getVectorOfStrings(const string &key)
 {
 	// Look up the string.
-	char *line=NULL;
+	char *line = NULL;
 	try {
 		ScopedLock lock(mLock);
-		const ConfigurationRecord& rec = lookup(key);
+		const ConfigurationRecord &rec = lookup(key);
 		line = strdup(rec.value().c_str());
 	} catch (ConfigurationTableKeyNotFound) {
 		// Raise an alert and re-throw the exception.
@@ -778,28 +765,30 @@ std::vector<string> ConfigurationTable::getVectorOfStrings(const string& key)
 
 	assert(line);
 	char *lp = line;
-	
+
 	// Parse the string.
 	std::vector<string> retVal;
 	while (lp) {
-		while (*lp==' ') lp++;
-		if (*lp == '\0') break;
-		char *tp = strsep(&lp," ");
-		if (!tp) break;
+		while (*lp == ' ')
+			lp++;
+		if (*lp == '\0')
+			break;
+		char *tp = strsep(&lp, " ");
+		if (!tp)
+			break;
 		retVal.push_back(tp);
 	}
 	free(line);
 	return retVal;
 }
 
-
-std::vector<unsigned> ConfigurationTable::getVector(const string& key)
+std::vector<unsigned> ConfigurationTable::getVector(const string &key)
 {
 	// Look up the string.
-	char *line=NULL;
+	char *line = NULL;
 	try {
 		ScopedLock lock(mLock);
-		const ConfigurationRecord& rec = lookup(key);
+		const ConfigurationRecord &rec = lookup(key);
 		line = strdup(rec.value().c_str());
 	} catch (ConfigurationTableKeyNotFound) {
 		// Raise an alert and re-throw the exception.
@@ -814,53 +803,55 @@ std::vector<unsigned> ConfigurationTable::getVector(const string& key)
 	std::vector<unsigned> retVal;
 	while (lp) {
 		// Watch for multiple or trailing spaces.
-		while (*lp==' ') lp++;
-		if (*lp=='\0') break;
-		retVal.push_back(strtol(lp,NULL,0));
-		strsep(&lp," ");
+		while (*lp == ' ')
+			lp++;
+		if (*lp == '\0')
+			break;
+		retVal.push_back(strtol(lp, NULL, 0));
+		strsep(&lp, " ");
 	}
 	free(line);
 	return retVal;
 }
 
-
-bool ConfigurationTable::remove(const string& key)
+bool ConfigurationTable::remove(const string &key)
 {
 	assert(mDB);
 
 	ScopedLock lock(mLock);
 	// Clear the cache entry and the database.
 	ConfigurationMap::iterator where = mCache.find(key);
-	if (where!=mCache.end()) mCache.erase(where);
+	if (where != mCache.end())
+		mCache.erase(where);
 	// Really remove it.
-	string cmd = "DELETE FROM CONFIG WHERE KEYSTRING=='"+key+"'";
-	return sqlite3_command(mDB,cmd.c_str());
+	string cmd = "DELETE FROM CONFIG WHERE KEYSTRING=='" + key + "'";
+	return sqlite3_command(mDB, cmd.c_str());
 }
 
-
-
-void ConfigurationTable::find(const string& pat, ostream& os) const
+void ConfigurationTable::find(const string &pat, ostream &os) const
 {
 	// Prepare the statement.
 	string cmd = "SELECT KEYSTRING,VALUESTRING FROM CONFIG WHERE KEYSTRING LIKE \"%" + pat + "%\"";
 	sqlite3_stmt *stmt;
-	if (sqlite3_prepare_statement(mDB,&stmt,cmd.c_str())) return;
+	if (sqlite3_prepare_statement(mDB, &stmt, cmd.c_str()))
+		return;
 	// Read the result.
-	int src = sqlite3_run_query(mDB,stmt);
-	while (src==SQLITE_ROW) {
-		const char* value = (const char*)sqlite3_column_text(stmt,1);
-		os << sqlite3_column_text(stmt,0) << " ";
+	int src = sqlite3_run_query(mDB, stmt);
+	while (src == SQLITE_ROW) {
+		const char *value = (const char *)sqlite3_column_text(stmt, 1);
+		os << sqlite3_column_text(stmt, 0) << " ";
 		int len = 0;
 		if (value) {
 			len = strlen(value);
 		}
-		if (len && value) os << value << endl;
-		else os << "(disabled)" << endl;
-		src = sqlite3_run_query(mDB,stmt);
+		if (len && value)
+			os << value << endl;
+		else
+			os << "(disabled)" << endl;
+		src = sqlite3_run_query(mDB, stmt);
 	}
 	sqlite3_finalize(stmt);
 }
-
 
 ConfigurationRecordMap ConfigurationTable::getAllPairs() const
 {
@@ -869,58 +860,63 @@ ConfigurationRecordMap ConfigurationTable::getAllPairs() const
 	// Prepare the statement.
 	string cmd = "SELECT KEYSTRING,VALUESTRING FROM CONFIG";
 	sqlite3_stmt *stmt;
-	if (sqlite3_prepare_statement(mDB,&stmt,cmd.c_str())) return tmp;
+	if (sqlite3_prepare_statement(mDB, &stmt, cmd.c_str()))
+		return tmp;
 	// Read the result.
-	int src = sqlite3_run_query(mDB,stmt);
-	while (src==SQLITE_ROW) {
-		const char* key = (const char*)sqlite3_column_text(stmt,0);
-		const char* value = (const char*)sqlite3_column_text(stmt,1);
+	int src = sqlite3_run_query(mDB, stmt);
+	while (src == SQLITE_ROW) {
+		const char *key = (const char *)sqlite3_column_text(stmt, 0);
+		const char *value = (const char *)sqlite3_column_text(stmt, 1);
 		if (key && value) {
 			string skey(key);
-			tmp[skey] = ConfigurationRecord(skey,value);
+			tmp[skey] = ConfigurationRecord(skey, value);
 		} else if (key && !value) {
 			string skey(key);
-			tmp[skey] = ConfigurationRecord(skey,false);
+			tmp[skey] = ConfigurationRecord(skey, false);
 		}
-		src = sqlite3_run_query(mDB,stmt);
+		src = sqlite3_run_query(mDB, stmt);
 	}
 	sqlite3_finalize(stmt);
 
 	return tmp;
 }
 
-bool ConfigurationTable::set(const string& key, const string& value)
+bool ConfigurationTable::set(const string &key, const string &value)
 {
 	assert(mDB);
 	ScopedLock lock(mLock);
 	string cmd;
 	if (keyDefinedInSchema(key)) {
-		cmd = "INSERT OR REPLACE INTO CONFIG (KEYSTRING,VALUESTRING,OPTIONAL,COMMENTS) VALUES (\"" + key + "\",\"" + value + "\",1,\'" + mSchema[key].getDescription() + "\')";
+		cmd = "INSERT OR REPLACE INTO CONFIG (KEYSTRING,VALUESTRING,OPTIONAL,COMMENTS) VALUES (\"" + key +
+		      "\",\"" + value + "\",1,\'" + mSchema[key].getDescription() + "\')";
 	} else {
-		cmd = "INSERT OR REPLACE INTO CONFIG (KEYSTRING,VALUESTRING,OPTIONAL) VALUES (\"" + key + "\",\"" + value + "\",1)";
+		cmd = "INSERT OR REPLACE INTO CONFIG (KEYSTRING,VALUESTRING,OPTIONAL) VALUES (\"" + key + "\",\"" +
+		      value + "\",1)";
 	}
-	
-	bool success = sqlite3_command(mDB,cmd.c_str());
+
+	bool success = sqlite3_command(mDB, cmd.c_str());
 	// Cache the result.
-	if (success) mCache[key] = ConfigurationRecord(key,value);
+	if (success)
+		mCache[key] = ConfigurationRecord(key, value);
 	return success;
 }
 
-bool ConfigurationTable::set(const string& key, long value)
+bool ConfigurationTable::set(const string &key, long value)
 {
 	char buffer[30];
-	sprintf(buffer,"%ld",value);
-	return set(key,buffer);
+	sprintf(buffer, "%ld", value);
+	return set(key, buffer);
 }
 
 void ConfigurationTable::checkCacheAge()
 {
-	// mLock is set by caller 
+	// mLock is set by caller
 	static time_t timeOfLastPurge = 0;
 	time_t now = time(NULL);
 	// purge every 3 seconds
 	// purge period cannot be configuration parameter
-	if (now - timeOfLastPurge < 3) return;
+	if (now - timeOfLastPurge < 3)
+		return;
 	timeOfLastPurge = now;
 	// this is purge() without the lock
 	ConfigurationMap::iterator mp = mCache.begin();
@@ -930,7 +926,6 @@ void ConfigurationTable::checkCacheAge()
 		mCache.erase(prev);
 	}
 }
-
 
 void ConfigurationTable::purge()
 {
@@ -943,21 +938,16 @@ void ConfigurationTable::purge()
 	}
 }
 
-
-void ConfigurationTable::setUpdateHook(void(*func)(void *,int ,char const *,char const *,sqlite3_int64))
+void ConfigurationTable::setUpdateHook(void (*func)(void *, int, char const *, char const *, sqlite3_int64))
 {
 	assert(mDB);
-	sqlite3_update_hook(mDB,func,NULL);
+	sqlite3_update_hook(mDB, func, NULL);
 }
 
+void ConfigurationTable::setCrossCheckHook(vector<string> (*wCrossCheck)(const string &)) { mCrossCheck = wCrossCheck; }
 
-void ConfigurationTable::setCrossCheckHook(vector<string> (*wCrossCheck)(const string&))
+vector<string> ConfigurationTable::crossCheck(const string &key)
 {
-	mCrossCheck = wCrossCheck;
-}
-
-
-vector<string> ConfigurationTable::crossCheck(const string& key) {
 	vector<string> ret;
 
 	if (mCrossCheck != NULL) {
@@ -970,47 +960,48 @@ vector<string> ConfigurationTable::crossCheck(const string& key) {
 void HashString::computeHash()
 {
 	// FIXME -- Someone needs to review this hash function.
-	const char* cstr = c_str();
+	const char *cstr = c_str();
 	mHash = 0;
-	for (unsigned i=0; i<size(); i++) {
+	for (unsigned i = 0; i < size(); i++) {
 		mHash = mHash ^ (mHash >> 32);
-		mHash = mHash*127 + cstr[i];
+		mHash = mHash * 127 + cstr[i];
 	}
 }
 
-
-void SimpleKeyValue::addItem(const char* pair_orig)
+void SimpleKeyValue::addItem(const char *pair_orig)
 {
 	char *pair = strdup(pair_orig);
 	char *key = pair;
-	char *mark = strchr(pair,'=');
-	if (!mark) return;
+	char *mark = strchr(pair, '=');
+	if (!mark)
+		return;
 	*mark = '\0';
-	char *value = mark+1;
+	char *value = mark + 1;
 	mMap[key] = value;
 	free(pair);
 }
 
-
-
-const char* SimpleKeyValue::get(const char* key) const
+const char *SimpleKeyValue::get(const char *key) const
 {
 	HashStringMap::const_iterator p = mMap.find(key);
-	if (p==mMap.end()) return NULL;
+	if (p == mMap.end())
+		return NULL;
 	return p->second.c_str();
 }
 
 std::string SimpleKeyValue::getStrOrBust(const char *key) const
 {
 	HashStringMap::const_iterator p = mMap.find(key);
-	if (p==mMap.end()) throw(SimpleKeyValueException(format("key not found:%s",key)));
+	if (p == mMap.end())
+		throw(SimpleKeyValueException(format("key not found:%s", key)));
 	return p->second;
 }
 
 long SimpleKeyValue::getNumOrBust(const char *key) const
 {
 	HashStringMap::const_iterator p = mMap.find(key);
-	if (p==mMap.end()) throw(SimpleKeyValueException(format("key not found:%s",key)));
+	if (p == mMap.end())
+		throw(SimpleKeyValueException(format("key not found:%s", key)));
 	// TODO: we should verify it is really a number.
 	return atol(p->second.c_str());
 }
@@ -1018,30 +1009,33 @@ long SimpleKeyValue::getNumOrBust(const char *key) const
 long SimpleKeyValue::getNum(const char *key, bool &valid) const
 {
 	HashStringMap::const_iterator p = mMap.find(key);
-	if (p==mMap.end()) { valid = false; return 0; }
+	if (p == mMap.end()) {
+		valid = false;
+		return 0;
+	}
 	// TODO: we should verify it is really a number.
 	return atol(p->second.c_str());
 }
 
-
-void SimpleKeyValue::addItems(const char* pairs_orig)
+void SimpleKeyValue::addItems(const char *pairs_orig)
 {
 	char *pairs = strdup(pairs_orig);
 	char *thisPair;
-	while ((thisPair=strsep(&pairs," "))!=NULL) {
+	while ((thisPair = strsep(&pairs, " ")) != NULL) {
 		addItem(thisPair);
 	}
 	free(pairs);
 }
 
-
-bool ConfigurationKey::isValidIP(const std::string& ip) {
+bool ConfigurationKey::isValidIP(const std::string &ip)
+{
 	struct sockaddr_in sa;
 	return inet_pton(AF_INET, ip.c_str(), &(sa.sin_addr)) != 0;
 }
 
-
-void ConfigurationKey::getMinMaxStepping(const ConfigurationKey &key, std::string &min, std::string &max, std::string &stepping) {
+void ConfigurationKey::getMinMaxStepping(
+	const ConfigurationKey &key, std::string &min, std::string &max, std::string &stepping)
+{
 	uint delimiter;
 	int startPos;
 	uint endPos;
@@ -1053,18 +1047,19 @@ void ConfigurationKey::getMinMaxStepping(const ConfigurationKey &key, std::strin
 	startPos = tmp.find('(');
 	if (startPos != (int)std::string::npos) {
 		endPos = tmp.find(')');
-		stepping = tmp.substr(startPos+1, endPos-startPos-1);
+		stepping = tmp.substr(startPos + 1, endPos - startPos - 1);
 		tmp = tmp.substr(0, startPos);
 	}
 	startPos = 0;
 
 	delimiter = tmp.find(':', startPos);
-	min = tmp.substr(startPos, delimiter-startPos);
-	max = tmp.substr(delimiter+1, tmp.find(',', delimiter)-delimiter-1);
+	min = tmp.substr(startPos, delimiter - startPos);
+	max = tmp.substr(delimiter + 1, tmp.find(',', delimiter) - delimiter - 1);
 }
 
-
-template<class T> bool ConfigurationKey::isInValRange(const ConfigurationKey &key, const std::string& val, const bool isInteger) {
+template <class T>
+bool ConfigurationKey::isInValRange(const ConfigurationKey &key, const std::string &val, const bool isInteger)
+{
 	bool ret = false;
 
 	T convVal;
@@ -1096,106 +1091,111 @@ template<class T> bool ConfigurationKey::isInValRange(const ConfigurationKey &ke
 	return ret;
 }
 
-const std::string ConfigurationKey::visibilityLevelToString(const ConfigurationKey::VisibilityLevel& visibility) {
+const std::string ConfigurationKey::visibilityLevelToString(const ConfigurationKey::VisibilityLevel &visibility)
+{
 	std::string ret = "UNKNOWN ERROR";
 
 	switch (visibility) {
-		case ConfigurationKey::CUSTOMER:
-			ret = "customer - can be freely changed by the customer without any detriment to their system";
-			break;
-		case ConfigurationKey::CUSTOMERSITE:
-			ret = "customer site - these values are different for each BTS and should not be left default";
-			break;
-		case ConfigurationKey::CUSTOMERTUNE:
-			ret = "customer tune - should only be changed to tune an installation to better suit the physical environment or MS usage pattern";
-			break;
-		case ConfigurationKey::CUSTOMERWARN:
-			ret = "customer warn - a warning will be presented and confirmation required before changing this sensitive setting";
-			break;
-		case ConfigurationKey::DEVELOPER:
-			ret = "developer - should only be changed by developers to debug/optimize the implementation";
-			break;
-		case ConfigurationKey::FACTORY:
-			ret = "factory - set once at the factory, should never be changed";
-			break;
+	case ConfigurationKey::CUSTOMER:
+		ret = "customer - can be freely changed by the customer without any detriment to their system";
+		break;
+	case ConfigurationKey::CUSTOMERSITE:
+		ret = "customer site - these values are different for each BTS and should not be left default";
+		break;
+	case ConfigurationKey::CUSTOMERTUNE:
+		ret = "customer tune - should only be changed to tune an installation to better suit the physical "
+		      "environment or MS usage pattern";
+		break;
+	case ConfigurationKey::CUSTOMERWARN:
+		ret = "customer warn - a warning will be presented and confirmation required before changing this "
+		      "sensitive setting";
+		break;
+	case ConfigurationKey::DEVELOPER:
+		ret = "developer - should only be changed by developers to debug/optimize the implementation";
+		break;
+	case ConfigurationKey::FACTORY:
+		ret = "factory - set once at the factory, should never be changed";
+		break;
 	}
 
 	return ret;
 }
 
-const std::string ConfigurationKey::typeToString(const ConfigurationKey::Type& type) {
+const std::string ConfigurationKey::typeToString(const ConfigurationKey::Type &type)
+{
 	std::string ret = "UNKNOWN ERROR";
 
 	switch (type) {
-		case BOOLEAN:
-			ret = "boolean";
-			break;
-		case CHOICE_OPT:
-			ret = "multiple choice (optional)";
-			break;
-		case CHOICE:
-			ret = "multiple choice";
-			break;
-		case CIDR_OPT:
-			ret = "CIDR notation (optional)";
-			break;
-		case CIDR:
-			ret = "CIDR notation";
-			break;
-		case FILEPATH_OPT:
-			ret = "file path (optional)";
-			break;
-		case FILEPATH:
-			ret = "file path";
-			break;
-		case HOSTANDPORT_OPT:
-			ret = "hostname or IP address and port (optional)";
-			break;
-		case HOSTANDPORT:
-			ret = "hostname or IP address and port";
-			break;
-		case IPADDRESS_OPT:
-			ret = "IP address (optional)";
-			break;
-		case IPADDRESS:
-			ret = "IP address";
-			break;
-		case IPANDPORT:
-			ret = "IP address and port";
-			break;
-		case MIPADDRESS_OPT:
-			ret = "space-separated list of IP addresses (optional)";
-			break;
-		case MIPADDRESS:
-			ret = "space-separated list of IP addresses";
-			break;
-		case PORT_OPT:
-			ret = "IP port (optional)";
-			break;
-		case PORT:
-			ret = "IP port";
-			break;
-		case REGEX_OPT:
-			ret = "regular expression (optional)";
-			break;
-		case REGEX:
-			ret = "regular expression";
-			break;
-		case STRING_OPT:
-			ret = "string (optional)";
-			break;
-		case STRING:
-			ret = "string";
-			break;
-		case VALRANGE:
-			ret = "value range";
-			break;
+	case BOOLEAN:
+		ret = "boolean";
+		break;
+	case CHOICE_OPT:
+		ret = "multiple choice (optional)";
+		break;
+	case CHOICE:
+		ret = "multiple choice";
+		break;
+	case CIDR_OPT:
+		ret = "CIDR notation (optional)";
+		break;
+	case CIDR:
+		ret = "CIDR notation";
+		break;
+	case FILEPATH_OPT:
+		ret = "file path (optional)";
+		break;
+	case FILEPATH:
+		ret = "file path";
+		break;
+	case HOSTANDPORT_OPT:
+		ret = "hostname or IP address and port (optional)";
+		break;
+	case HOSTANDPORT:
+		ret = "hostname or IP address and port";
+		break;
+	case IPADDRESS_OPT:
+		ret = "IP address (optional)";
+		break;
+	case IPADDRESS:
+		ret = "IP address";
+		break;
+	case IPANDPORT:
+		ret = "IP address and port";
+		break;
+	case MIPADDRESS_OPT:
+		ret = "space-separated list of IP addresses (optional)";
+		break;
+	case MIPADDRESS:
+		ret = "space-separated list of IP addresses";
+		break;
+	case PORT_OPT:
+		ret = "IP port (optional)";
+		break;
+	case PORT:
+		ret = "IP port";
+		break;
+	case REGEX_OPT:
+		ret = "regular expression (optional)";
+		break;
+	case REGEX:
+		ret = "regular expression";
+		break;
+	case STRING_OPT:
+		ret = "string (optional)";
+		break;
+	case STRING:
+		ret = "string";
+		break;
+	case VALRANGE:
+		ret = "value range";
+		break;
 	}
 
 	return ret;
 }
 
-void ConfigurationKey::printKey(const ConfigurationKey &key, const std::string& currentValue, ostream& os) {
+void ConfigurationKey::printKey(const ConfigurationKey &key, const std::string &currentValue, ostream &os)
+{
 	os << key.getName() << " ";
 	if (!currentValue.length()) {
 		os << "(disabled)";
@@ -1208,7 +1208,8 @@ void ConfigurationKey::printKey(const ConfigurationKey &key, const std::string& 
 	os << endl;
 }
 
-void ConfigurationKey::printDescription(const ConfigurationKey &key, ostream& os) {
+void ConfigurationKey::printDescription(const ConfigurationKey &key, ostream &os)
+{
 	std::string tmp;
 	unsigned scope;
 
@@ -1235,8 +1236,9 @@ void ConfigurationKey::printDescription(const ConfigurationKey &key, ostream& os
 		do {
 			startPos++;
 			delimiter = tmp.find(':', startPos);
-			os << " - valid values:     " << "from " << tmp.substr(startPos, delimiter-startPos) << " to "
-				<< tmp.substr(delimiter+1, tmp.find(',', delimiter)-delimiter-1) << std::endl;
+			os << " - valid values:     "
+			   << "from " << tmp.substr(startPos, delimiter - startPos) << " to "
+			   << tmp.substr(delimiter + 1, tmp.find(',', delimiter) - delimiter - 1) << std::endl;
 
 		} while ((startPos = tmp.find(',', startPos)) != (int)std::string::npos);
 
@@ -1247,10 +1249,11 @@ void ConfigurationKey::printDescription(const ConfigurationKey &key, ostream& os
 		do {
 			startPos++;
 			if ((endPos = tmp.find('|', startPos)) != std::string::npos) {
-				os << " - valid values:     " << tmp.substr(startPos, endPos-startPos);
-				os << " = " << tmp.substr(endPos+1, tmp.find(',', endPos)-endPos-1) << std::endl;
+				os << " - valid values:     " << tmp.substr(startPos, endPos - startPos);
+				os << " = " << tmp.substr(endPos + 1, tmp.find(',', endPos) - endPos - 1) << std::endl;
 			} else {
-				os << " - valid values:     " << tmp.substr(startPos, tmp.find(',', startPos)-startPos) << std::endl;
+				os << " - valid values:     "
+				   << tmp.substr(startPos, tmp.find(',', startPos) - startPos) << std::endl;
 			}
 
 		} while ((startPos = tmp.find(',', startPos)) != (int)std::string::npos);
@@ -1288,6 +1291,3 @@ void ConfigurationKey::printDescription(const ConfigurationKey &key, ostream& os
 		}
 	}
 }
-
-
-// vim: ts=4 sw=4
