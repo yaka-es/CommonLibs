@@ -163,6 +163,7 @@ public:
 	// error messages.
 	ConfigurationTable(const char *filename = ":memory:", const char *wCmdName = 0,
 		ConfigurationKeyMap wSchema = ConfigurationKeyMap());
+	virtual ~ConfigurationTable() {}
 
 	/** Generate an up-to-date example sql file for new installs. */
 	std::string getDefaultSQL(const std::string &program, const std::string &version);
@@ -396,5 +397,16 @@ public:
 	static void printKey(const ConfigurationKey &key, const std::string &currentValue, std::ostream &os);
 	static void printDescription(const ConfigurationKey &key, std::ostream &os);
 };
+
+// Reference to a global config table, used all over the system.
+extern ConfigurationTable *gConfigObject;
+
+static inline ConfigurationTable &getConfigTable()
+{
+	assert(gConfigObject);
+	return *gConfigObject;
+}
+
+#define gConfigTable getConfigTable()
 
 #endif

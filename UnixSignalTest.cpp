@@ -28,7 +28,7 @@
 #include "Logger.h"
 #include "UnixSignal.h"
 
-ConfigurationTable gConfig;
+ConfigurationTable *gConfigObject;
 
 void test1(int sig) { printf("Test 1, signal %d\n", sig); }
 void test2(int sig) { printf("Test 2, signal %d\n", sig); }
@@ -49,7 +49,10 @@ void registerFuncs(int sig)
 
 int main(int argc, char **argv)
 {
+	gConfigObject = new ConfigurationTable();
+
 	gLogInit("UnixSignalTest", "DEBUG", LOG_LOCAL7);
+
 	registerFuncs(SIGINT);
 	registerFuncs(SIGHUP);
 	registerFuncs(SIGTERM);
@@ -70,6 +73,8 @@ int main(int argc, char **argv)
 	printf("%d for SIGTERM, %d for SIGHUP, %d for SIGINT\n", SIGTERM, SIGHUP, SIGINT);
 	while (true)
 		sleep(60);
+
+	delete gConfigObject;
 
 	return 0;
 }

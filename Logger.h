@@ -66,9 +66,11 @@ extern pid_t gPid;
 // (pat) If you '#define LOG_GROUP groupname' before including Logger.h, then you can set Log.Level.groupname as well as
 // Log.Level.filename.
 #ifdef LOG_GROUP
-//#define CHECK_GROUP_LOG_LEVEL(groupname,loglevel) gCheckGroupLogLevel(#groupname,loglevel)
-//#define IS_LOG_LEVEL(wLevel) (CHECK_GROUP_LOG_LEVEL(LOG_GROUP,LOG_##wLevel) ||
-// gGetLoggingLevel(__FILE__)>=LOG_##wLevel)
+#if 0
+#define CHECK_GROUP_LOG_LEVEL(groupname, loglevel) gCheckGroupLogLevel(#groupname, loglevel)
+#define IS_LOG_LEVEL(wLevel) (CHECK_GROUP_LOG_LEVEL(LOG_GROUP, LOG_##wLevel) || \
+	gGetLoggingLevel(__FILE__) >= LOG_##wLevel)
+#endif
 #define IS_LOG_LEVEL(wLevel) \
 	(gCheckGroupLogLevel(LOG_GROUP, LOG_##wLevel) || gGetLoggingLevel(__FILE__) >= LOG_##wLevel)
 #define IS_WATCH_LEVEL(wLevel) gCheckGroupWatchLevel(LOG_GROUP, LOG_##wLevel)
@@ -77,15 +79,9 @@ extern pid_t gPid;
 #define IS_LOG_LEVEL(wLevel) (gGetLoggingLevel(__FILE__) >= LOG_##wLevel)
 #endif
 
-#ifdef NDEBUG
-#define LOG(wLevel) \
-	if (LOG_##wLevel != LOG_DEBUG && IS_LOG_LEVEL(wLevel)) \
-	_LOG(wLevel)
-#else
 #define LOG(wLevel) \
 	if (IS_LOG_LEVEL(wLevel)) \
-	_LOG(wLevel)
-#endif
+	_LOG(wLevel) /* << ... << ... << ...; */
 
 // pat: And for your edification here are the 'levels' as defined in syslog.h:
 // LOG_EMERG   0  system is unusable
@@ -128,26 +124,26 @@ extern pid_t gPid;
 	{ \
 		LOG(DEBUG) << format(__VA_ARGS__); \
 		if (IS_WATCH_LEVEL(DEBUG)) { \
-			printf("%s ", timestr(7).c_str()); \
-			printf(__VA_ARGS__); \
+			fprintf(stderr, "%s ", Utils::timestr(7).c_str()); \
+			fprintf(stderr, __VA_ARGS__); \
 		} \
 	}
 #define WATCHLEVEL(level, ...) \
 	if (IS_WATCH_LEVEL(level)) { \
-		std::cout << timestr(7) << " " << __VA_ARGS__ << std::endl; \
+		std::cerr << Utils::timestr(7) << " " << __VA_ARGS__ << std::endl; \
 	}
 #define WATCH(...) \
 	{ \
 		LOG(DEBUG) << __VA_ARGS__; \
 		if (IS_WATCH_LEVEL(DEBUG)) { \
-			std::cout << timestr(7) << " " << __VA_ARGS__ << endl; \
+			std::cerr << Utils::timestr(7) << " " << __VA_ARGS__ << endl; \
 		} \
 	}
 #define WATCHINFO(...) \
 	{ \
 		LOG(INFO) << __VA_ARGS__; \
 		if (IS_WATCH_LEVEL(INFO)) { \
-			std::cout << timestr(7) << " " << __VA_ARGS__ << endl; \
+			std::cerr << Utils::timestr(7) << " " << __VA_ARGS__ << endl; \
 		} \
 	}
 
@@ -155,15 +151,14 @@ extern pid_t gPid;
 //#include "Utils.h"
 
 /**
-	A C++ stream-based thread-safe logger.
-	Derived from Dr. Dobb's Sept. 2007 issue.
-	Updated to use syslog.
-	This object is NOT the global logger;
-	every log record is an object of this class.
-*/
-class Log {
+ * A C++ stream-based thread-safe logger.
+ * Derived from Dr. Dobb's Sept. 2007 issue.
+ * Updated to use syslog.
+ * This object is NOT the global logger;
+ * every log record is an object of this class.
+ */
 
-public:
+class Log {
 protected:
 	std::ostringstream mStream; ///< This is where we buffer up the log entry.
 	int mPriority;		    ///< Priority of current report.
@@ -182,14 +177,24 @@ public:
 
 	std::ostringstream &get();
 };
-extern bool gLogToConsole; // Pat added for easy debugging.
 
 // (pat) Added logging by explicit group name.
 class LogGroup {
 public:
 	// These must exactly match LogGroup::mGroupNames:
 	// That kinda sucks, but using static data prevents any constructor race.
-	enum Group { Control, SIP, GSM, GPRS, Layer2, SMS, _NumberOfLogGroups };
+	enum Group {
+		Control,
+		SIP,
+		GSM,
+		GSM_L1,
+		GSM_L2,
+		GSM_L3,
+		GPRS,
+		Layer2,
+		SMS,
+		_NumberOfLogGroups
+	};
 	void setAll(); // Update mDebugLevel from the Log.Group.... config database options.
 
 	int8_t mDebugLevel[_NumberOfLogGroups]; // use int in case a -1 value gets in here.
@@ -204,34 +209,39 @@ private:
 extern LogGroup gLogGroup;
 
 // We inline this:
-static __inline__ bool gCheckGroupLogLevel(LogGroup::Group group, unsigned level)
+static __inline__ bool gCheckGroupLogLevel(LogGroup::Group logGroup, unsigned level)
 {
-	assert(group < LogGroup::_NumberOfLogGroups);
-	//_LOG(DEBUG) << LOGVAR(group)<<LOGVAR(level)<<LOGVAR2("stashed",(unsigned) gLogGroup.mDebugLevel[group]);
-	return gLogGroup.mDebugLevel[group] >= (int)level;
+	assert(logGroup < LogGroup::_NumberOfLogGroups);
+	//_LOG(DEBUG) << LOGVAR(logGroup)<<LOGVAR(level)<<LOGVAR2("stashed",(unsigned) gLogGroup.mDebugLevel[logGroup]);
+	return gLogGroup.mDebugLevel[logGroup] >= (int)level;
 }
-static __inline__ bool gCheckGroupWatchLevel(LogGroup::Group group, unsigned level)
+static __inline__ bool gCheckGroupWatchLevel(LogGroup::Group logGroup, unsigned level)
 {
-	assert(group < LogGroup::_NumberOfLogGroups);
-	//_LOG(DEBUG) << LOGVAR(group)<<LOGVAR(level)<<LOGVAR2("stashed",(unsigned) gLogGroup.mDebugLevel[group]);
-	return gLogGroup.mWatchLevel[group] >= (int)level;
+	assert(logGroup < LogGroup::_NumberOfLogGroups);
+	//_LOG(DEBUG) << LOGVAR(logGroup)<<LOGVAR(level)<<LOGVAR2("stashed",(unsigned) gLogGroup.mDebugLevel[logGroup]);
+	return gLogGroup.mWatchLevel[logGroup] >= (int)level;
 }
 
-std::list<std::string> gGetLoggerAlarms(); ///< Get a copy of the recent alarm list.
+extern std::list<std::string> gGetLoggerAlarms(); ///< Get a copy of the recent alarm list.
 
 /**@ Global control and initialization of the logging system. */
 //@{
 
-/** Initialize the global logging system with filename  test  10*/
-void gLogInitWithFile(const char *name, const char *level, int facility, char *LogFilePath = NULL);
-
 /** Initialize the global logging system. */
-void gLogInit(const char *name, const char *level = NULL, int facility = LOG_USER);
+extern void gLogInit(const std::string &appName, const std::string &level = "", int facility = LOG_USER);
 /** Get the logging level associated with a given file. */
-int gGetLoggingLevel(const char *filename = NULL);
+extern int gGetLoggingLevel(const char *filename = NULL);
 /** Allow early logging when still in constructors */
-void gLogEarly(int level, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+extern void gLogEarly(int level, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+
 //@}
+
+namespace Logging {
+
+extern void basicConfig(const std::string &appName);
+extern bool openLogFile(const std::string &filename);
+
+};
 
 // (pat) This is historical, some files include Logger.h and expect to get these too.  These should be removed.
 #include "Threads.h" // must be after defines above, if these files are to be allowed to use LOG()

@@ -43,8 +43,6 @@
 
 // SelfDetect gSelf;
 
-extern ConfigurationTable gConfig;
-
 static void e(void) { gSelf.Exit(-999); }
 
 static void sigfcn(int sig) { gSelf.Exit(sig); }
@@ -77,8 +75,8 @@ void SelfDetect::RegisterProgram(const char *argv0)
 	fprintf(fp, "%d\n", getpid());
 	fclose(fp);
 	atexit(e);
-	gSigVec.CoreName(gConfig.getStr("Core.File"), gConfig.getBool("Core.Pid"));
-	gSigVec.TarName(gConfig.getStr("Core.TarFile"), gConfig.getBool("Core.SaveFiles"));
+	gSigVec.CoreName(gConfigTable.getStr("Core.File"), gConfigTable.getBool("Core.Pid"));
+	gSigVec.TarName(gConfigTable.getStr("Core.TarFile"), gConfigTable.getBool("Core.SaveFiles"));
 
 	// Now, register for all signals to do the cleanup
 	for (int i = 1; i < UnixSignal::C_NSIG; i++) {

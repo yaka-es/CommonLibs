@@ -205,14 +205,12 @@ bool ReportingTable::commit()
 	return true;
 }
 
-extern ReportingTable gReports;
-
 void *reportingBatchCommitter(void *)
 {
-	gReports.mReportRunning = true;
-	while (gReports.mReportRunning) {
+	gReports->mReportRunning = true;
+	while (gReports->mReportRunning) {
 		sleep(10);
-		gReports.commit();
+		gReports->commit();
 	}
 
 	return NULL;

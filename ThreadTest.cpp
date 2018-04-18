@@ -35,7 +35,7 @@
 using namespace Utils;
 
 // We must have a gConfig now to include BitVector.
-ConfigurationTable gConfig;
+ConfigurationTable *gConfigObject;
 
 // pat 6-2014: Check how many threads we can create.
 
@@ -110,6 +110,8 @@ void *serviceLoop(void *arg)
 
 int main(int argc, char **argv)
 {
+	gConfigObject = new ConfigurationTable();
+
 	// Note: The Thread library sets the default stack size using pthread_attr_setstacksize
 	memset(outputs, 0, sizeof(outputs));
 
@@ -150,6 +152,8 @@ int main(int argc, char **argv)
 
 	double elapsed = timef() - start;
 	printf("Created %d threads in %.2g seconds\n", NUM_THREADS, elapsed);
+
+	delete gConfigObject;
 
 	return 0;
 }

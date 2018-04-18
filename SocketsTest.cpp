@@ -30,7 +30,7 @@
 #include "Sockets.h"
 #include "Threads.h"
 
-ConfigurationTable gConfig;
+ConfigurationTable *gConfigObject;
 
 static const int gNumToSend = 10;
 
@@ -72,6 +72,7 @@ void *testReaderUnix(void *)
 
 int main(int argc, char **argv)
 {
+	gConfigObject = new ConfigurationTable();
 
 	Thread readerThreadIP;
 	readerThreadIP.start(testReaderIP, NULL);
@@ -94,6 +95,8 @@ int main(int argc, char **argv)
 
 	readerThreadIP.join();
 	readerThreadUnix.join();
+
+	delete gConfigObject;
 
 	return 0;
 }

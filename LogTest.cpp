@@ -30,8 +30,7 @@
 #include "Configuration.h"
 #include "Logger.h"
 
-ConfigurationTable gConfig;
-// ConfigurationTable gConfig("example.config");
+ConfigurationTable *gConfigObject;
 
 void printAlarms()
 {
@@ -43,6 +42,8 @@ void printAlarms()
 
 int main(int argc, char **argv)
 {
+	gConfigObject = new ConfigurationTable();
+
 	gLogInit("LogTest", "NOTICE", LOG_LOCAL7);
 
 	LOG(EMERG) << " testing the logger.";
@@ -63,6 +64,8 @@ int main(int argc, char **argv)
 	}
 	std::cout << "you should see ten lines with the numbers 10..19:" << std::endl;
 	printAlarms();
+
+	delete gConfigObject;
 
 	return 0;
 }

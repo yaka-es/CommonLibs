@@ -29,7 +29,7 @@
 #include "Configuration.h"
 
 // We must have a gConfig now to include Vector.
-ConfigurationTable gConfig;
+ConfigurationTable *gConfigObject;
 
 using namespace std;
 
@@ -55,6 +55,8 @@ void anotherTest()
 
 int main(int argc, char **argv)
 {
+	gConfigObject = new ConfigurationTable();
+
 	anotherTest();
 	TestVector test1(5);
 	for (int i = 0; i < 5; i++)
@@ -84,6 +86,8 @@ int main(int argc, char **argv)
 		cout << testC << endl;
 		cout << testD << endl;
 	}
+
+	delete gConfigObject;
 
 	return 0;
 }

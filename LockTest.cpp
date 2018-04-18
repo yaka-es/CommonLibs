@@ -14,7 +14,7 @@
 
 using namespace std;
 
-ConfigurationTable gConfig;
+ConfigurationTable *gConfigObject;
 
 // LockTest starts three processes that lock and unlock three mutexes at random, to make sure no deadlock occurs.
 
@@ -94,6 +94,8 @@ typedef void *(*task_t)(void *);
 
 int main(int argc, char **argv)
 {
+	gConfigObject = new ConfigurationTable();
+
 	// Start the three processes running.
 	a.start1();
 	b.start1();
@@ -139,6 +141,8 @@ int main(int argc, char **argv)
 	a.t.join(); // Wait for it to finish.
 	b.t.join(); // Wait for it to finish.
 	printf("Test Finished.  During random sampling, locks held were: A %d, B %d, C %d\n", fndA, fndB, fndC);
+
+	delete gConfigObject;
 
 	return 0;
 }

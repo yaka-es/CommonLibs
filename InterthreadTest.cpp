@@ -29,7 +29,7 @@
 #include "Interthread.h"
 #include "Threads.h"
 
-ConfigurationTable gConfig;
+ConfigurationTable *gConfigObject;
 
 using namespace std;
 
@@ -191,6 +191,8 @@ void priority_queue_test()
 
 int main(int argc, char **argv)
 {
+	gConfigObject = new ConfigurationTable();
+
 	priority_queue_test();
 
 	Thread qReaderThread;
@@ -207,6 +209,8 @@ int main(int argc, char **argv)
 	qWriterThread.join();
 	mapReaderThread.join();
 	mapWriterThread.join();
+
+	delete gConfigObject;
 
 	return 0;
 }

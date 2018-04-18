@@ -32,54 +32,55 @@
 using namespace std;
 
 ConfigurationKeyMap getConfigurationKeys();
-ConfigurationTable gConfig("exampleconfig.db", "test", getConfigurationKeys());
+ConfigurationTable *gConfigObject;
 
 void purgeConfig(void *, int, char const *, char const *, sqlite3_int64)
 {
 	// cout << "update hook" << endl;
-	gConfig.purge();
+	gConfigTable.purge();
 }
 
 int main(int argc, char **argv)
 {
+	gConfigObject = new ConfigurationTable("exampleconfig.db", "test", getConfigurationKeys());
 
-	gConfig.setUpdateHook(purgeConfig);
+	gConfigTable.setUpdateHook(purgeConfig);
 
 	const char *keys[5] = {"key1", "key2", "key3", "key4", "key5"};
 
 	for (int i = 0; i < 5; i++) {
-		gConfig.set(keys[i], i);
+		gConfigTable.set(keys[i], i);
 	}
 
 	for (int i = 0; i < 5; i++) {
-		cout << "table[" << keys[i] << "]=" << gConfig.getStr(keys[i]) << endl;
-		cout << "table[" << keys[i] << "]=" << gConfig.getNum(keys[i]) << endl;
+		cout << "table[" << keys[i] << "]=" << gConfigTable.getStr(keys[i]) << endl;
+		cout << "table[" << keys[i] << "]=" << gConfigTable.getNum(keys[i]) << endl;
 	}
 
 	for (int i = 0; i < 5; i++) {
-		cout << "defined table[" << keys[i] << "]=" << gConfig.defines(keys[i]) << endl;
+		cout << "defined table[" << keys[i] << "]=" << gConfigTable.defines(keys[i]) << endl;
 	}
 
-	gConfig.set("key5", "100 200 300  400 ");
-	std::vector<unsigned> vect = gConfig.getVector("key5");
+	gConfigTable.set("key5", "100 200 300  400 ");
+	std::vector<unsigned> vect = gConfigTable.getVector("key5");
 	cout << "vect length " << vect.size() << ": ";
 	for (unsigned i = 0; i < vect.size(); i++)
 		cout << " " << vect[i];
 	cout << endl;
-	std::vector<string> svect = gConfig.getVectorOfStrings("key5");
+	std::vector<string> svect = gConfigTable.getVectorOfStrings("key5");
 	cout << "vect length " << svect.size() << ": ";
 	for (unsigned i = 0; i < svect.size(); i++)
 		cout << " " << svect[i] << ":";
 	cout << endl;
 
-	cout << "bool " << gConfig.getBool("booltest") << endl;
-	gConfig.set("booltest", 1);
-	cout << "bool " << gConfig.getBool("booltest") << endl;
-	gConfig.set("booltest", 0);
-	cout << "bool " << gConfig.getBool("booltest") << endl;
+	cout << "bool " << gConfigTable.getBool("booltest") << endl;
+	gConfigTable.set("booltest", 1);
+	cout << "bool " << gConfigTable.getBool("booltest") << endl;
+	gConfigTable.set("booltest", 0);
+	cout << "bool " << gConfigTable.getBool("booltest") << endl;
 
-	gConfig.getStr("newstring");
-	gConfig.getNum("numnumber");
+	gConfigTable.getStr("newstring");
+	gConfigTable.getNum("numnumber");
 
 	SimpleKeyValue pairs;
 	pairs.addItems(" a=1 b=34 dd=143 ");
@@ -87,23 +88,25 @@ int main(int argc, char **argv)
 	cout << pairs.get("b") << endl;
 	cout << pairs.get("dd") << endl;
 
-	gConfig.set("fkey", "123.456");
-	float fval = gConfig.getFloat("fkey");
+	gConfigTable.set("fkey", "123.456");
+	float fval = gConfigTable.getFloat("fkey");
 	cout << "fkey " << fval << endl;
 
 	cout << "search fkey:" << endl;
-	gConfig.find("fkey", cout);
+	gConfigTable.find("fkey", cout);
 	cout << "search fkey:" << endl;
-	gConfig.find("fkey", cout);
-	gConfig.remove("fkey");
+	gConfigTable.find("fkey", cout);
+	gConfigTable.remove("fkey");
 	cout << "search fkey:" << endl;
-	gConfig.find("fkey", cout);
+	gConfigTable.find("fkey", cout);
 
 	try {
-		gConfig.getNum("supposedtoabort");
+		gConfigTable.getNum("supposedtoabort");
 	} catch (ConfigurationTableKeyNotFound) {
 		cout << "ConfigurationTableKeyNotFound exception successfully caught." << endl;
 	}
+
+	delete gConfigObject;
 
 	return 0;
 }

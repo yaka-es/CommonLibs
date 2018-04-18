@@ -12,7 +12,7 @@
 
 using namespace std;
 
-ConfigurationTable gConfig; // Needed for logger.
+ConfigurationTable *gConfigObject; // Needed for logger.
 
 struct foo : public RefCntBase {
 	string id;
@@ -154,6 +154,8 @@ void asciiEncoderTest(bool verbose)
 
 int main(int argc, char **argv)
 {
+	gConfigObject = new ConfigurationTable();
+
 	bool verbose = argc > 1;
 
 	printf("Utils Test starting.\n");

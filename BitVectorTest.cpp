@@ -36,7 +36,7 @@
 
 using namespace std;
 
-ConfigurationTable gConfig; // We must have a gConfig now to include BitVector.
+ConfigurationTable *gConfigObject; // We must have a gConfig now to include BitVector.
 
 void origTest()
 {
@@ -124,8 +124,12 @@ BitVector randomBitVector(int n)
 
 int main(int argc, char **argv)
 {
+	gConfigObject = new ConfigurationTable();
+
 	anotherTest();
 	origTest();
+
+	delete gConfigObject;
 
 	return 0;
 }

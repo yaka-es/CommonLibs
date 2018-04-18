@@ -96,8 +96,8 @@ public:
 };
 
 /** Periodically triggers ReportingTable::commit(). */
-void *reportingBatchCommitter(void *);
+extern void *reportingBatchCommitter(void *);
 
-extern ReportingTable gReports;
+extern ReportingTable *gReports;
 
 #endif

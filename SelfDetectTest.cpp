@@ -28,7 +28,7 @@
 #include "Logger.h"
 #include "SelfDetect.h"
 
-ConfigurationTable gConfig;
+ConfigurationTable *gConfigObject;
 
 // For best effects, run this program thrice: once with a pre-created
 // /var/run/argv.pid, and once without.  First one should exit with an
@@ -36,6 +36,8 @@ ConfigurationTable gConfig;
 // Control-C.
 int main(int argc, char **argv)
 {
+	gConfigObject = new ConfigurationTable();
+
 	int ret;
 	gLogInit("SelfDetectTest", "DEBUG", LOG_LOCAL7);
 	gSelf.RegisterProgram(argv[0]);
@@ -68,6 +70,8 @@ int main(int argc, char **argv)
 		while (1)
 			sleep(60);
 	}
+
+	delete gConfigObject;
 
 	return 0;
 }
